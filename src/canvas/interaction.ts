@@ -476,11 +476,47 @@ function insertWaypointOnSegment(pathId: string, mx: number, my: number): void {
 function placeIntersection(mx: number, my: number): void {
   if (!store.mapData) return;
   const n = screenToNormalized(mx, my);
+  let snapped = { x: n.x, y: n.y };
+
+  if (store.snapEnabled) {
+    let minDist = SNAP_THRESHOLD_PX;
+    for (const path of store.mapData.paths) {
+      for (const wp of path.waypoints) {
+        const sp = normalizedToScreen(wp.x, wp.y);
+        const d = distance({ x: mx, y: my }, sp);
+        if (d < minDist) {
+          minDist = d;
+          snapped = { x: wp.x, y: wp.y };
+        }
+      }
+      for (let i = 0; i < path.waypoints.length - 1; i++) {
+        const a = normalizedToScreen(path.waypoints[i].x, path.waypoints[i].y);
+        const b = normalizedToScreen(path.waypoints[i + 1].x, path.waypoints[i + 1].y);
+        const d = distanceToSegment({ x: mx, y: my }, a, b);
+        if (d < minDist) {
+          const na = path.waypoints[i];
+          const nb = path.waypoints[i + 1];
+          const abx = b.x - a.x;
+          const aby = b.y - a.y;
+          const len2 = abx * abx + aby * aby;
+          if (len2 > 0) {
+            let t = ((mx - a.x) * abx + (my - a.y) * aby) / len2;
+            t = Math.max(0, Math.min(1, t));
+            snapped = {
+              x: na.x + (nb.x - na.x) * t,
+              y: na.y + (nb.y - na.y) * t,
+            };
+          }
+        }
+      }
+    }
+  }
+
   store.addIntersection({
     id: store.generateId(),
     label: `Intersection ${store.mapData.intersections.length + 1}`,
-    x: n.x,
-    y: n.y,
+    x: snapped.x,
+    y: snapped.y,
     branches: [],
   });
 }
