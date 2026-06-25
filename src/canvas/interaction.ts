@@ -246,22 +246,21 @@ function onMouseDown(event: MouseEvent, _canvas: HTMLCanvasElement): void {
     case 'endPoint':
       placeEndPoint(mx, my);
       break;
-    case 'exclusionZone':
-      if (store.exclusionZoneMode === 'polygon') {
-        if (store.isDrawingPolygon && store.pendingPolygonVertices.length >= 3) {
-          const first = normalizedToScreen(
-            store.pendingPolygonVertices[0].x,
-            store.pendingPolygonVertices[0].y
-          );
-          if (distance({ x: mx, y: my }, first) < HIT_THRESHOLD_PX) {
-            finishPolygon();
-            break;
-          }
+    case 'exclusionPolygon':
+      if (store.isDrawingPolygon && store.pendingPolygonVertices.length >= 3) {
+        const first = normalizedToScreen(
+          store.pendingPolygonVertices[0].x,
+          store.pendingPolygonVertices[0].y
+        );
+        if (distance({ x: mx, y: my }, first) < HIT_THRESHOLD_PX) {
+          finishPolygon();
+          break;
         }
-        addPolygonVertex(mx, my);
-      } else {
-        placeCircle(mx, my);
       }
+      addPolygonVertex(mx, my);
+      break;
+    case 'exclusionCircle':
+      placeCircle(mx, my);
       break;
     default:
       store.selectItem(null);

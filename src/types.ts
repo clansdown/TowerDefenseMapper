@@ -72,7 +72,7 @@ export interface MapMetadata {
 }
 
 /** Available editing tools. */
-export type ToolType = 'select' | 'spawnPoint' | 'path' | 'intersection' | 'exclusionZone' | 'endPoint';
+export type ToolType = 'select' | 'spawnPoint' | 'path' | 'intersection' | 'exclusionPolygon' | 'exclusionCircle' | 'endPoint';
 
 /** Zoom and pan state for the canvas viewport. */
 export interface ZoomPanState {

@@ -21,8 +21,6 @@ export class Store {
   selectedTool: ToolType = 'select';
   selectedItemId: string | null = null;
   snapEnabled = false;
-  /** State of the exclusion zone editor: 'polygon' or 'circle' */
-  exclusionZoneMode: 'polygon' | 'circle' = 'polygon';
   /** Waypoints for the path currently being drawn */
   pendingPathWaypoints: Point[] = [];
   /** Vertices for the polygon exclusion zone currently being drawn */

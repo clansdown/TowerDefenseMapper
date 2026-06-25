@@ -7,7 +7,8 @@ const TOOLS: { type: ToolType; label: string; icon: string }[] = [
   { type: 'path', label: 'Path', icon: '╱' },
   { type: 'intersection', label: 'Intersection', icon: '◈' },
   { type: 'endPoint', label: 'End', icon: '⊠' },
-  { type: 'exclusionZone', label: 'Exclusion', icon: '▣' },
+  { type: 'exclusionPolygon', label: 'Exclusion poly', icon: '▣' },
+  { type: 'exclusionCircle', label: 'Exclusion circ', icon: '⭘' },
 ];
 
 /**
@@ -29,12 +30,6 @@ export function createToolbar(container: HTMLElement): void {
       <hr class="my-2">
       <div class="d-flex gap-1">
         <button class="btn btn-outline-secondary btn-sm flex-fill" id="btn-zoom-fit" title="Fit to viewport">Fit</button>
-      </div>
-      <div class="mt-2">
-        <div class="btn-group btn-group-sm w-100" role="group">
-          <button class="btn btn-outline-secondary" id="btn-exclusion-polygon">Polygon</button>
-          <button class="btn btn-outline-secondary" id="btn-exclusion-circle">Circle</button>
-        </div>
       </div>
       <hr class="my-2">
       <div class="d-flex gap-1">
@@ -66,17 +61,6 @@ export function createToolbar(container: HTMLElement): void {
   container.querySelector('#btn-zoom-fit')!.addEventListener('click', () => {
     store.notify();
   });
-
-  const polygonBtn = container.querySelector('#btn-exclusion-polygon')!;
-  const circleBtn = container.querySelector('#btn-exclusion-circle')!;
-  polygonBtn.addEventListener('click', () => { store.exclusionZoneMode = 'polygon'; updateExclusionMode(); });
-  circleBtn.addEventListener('click', () => { store.exclusionZoneMode = 'circle'; updateExclusionMode(); });
-
-  function updateExclusionMode(): void {
-    polygonBtn.classList.toggle('active', store.exclusionZoneMode === 'polygon');
-    circleBtn.classList.toggle('active', store.exclusionZoneMode === 'circle');
-  }
-  updateExclusionMode();
 
   // Re-apply active state when tool changes
   store.subscribe(() => {
