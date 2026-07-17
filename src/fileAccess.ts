@@ -17,6 +17,7 @@ export function openImageFile(): void {
 async function openImageWithPicker(): Promise<void> {
   try {
     const [handle] = await (window as any).showOpenFilePicker({
+      id: 'tdm-image',
       types: [
         {
           description: 'Images',
@@ -71,6 +72,7 @@ export function exportJson(): void {
 async function saveWithPicker(json: string): Promise<void> {
   try {
     const handle = await (window as any).showSaveFilePicker({
+      id: 'tdm-json-save',
       suggestedName: `${store.mapData?.name ?? 'map'}.json`,
       types: [
         {
@@ -101,6 +103,7 @@ export function importJson(): void {
 async function importWithPicker(): Promise<void> {
   try {
     const [handle] = await (window as any).showOpenFilePicker({
+      id: 'tdm-json-open',
       types: [
         {
           description: 'JSON',
