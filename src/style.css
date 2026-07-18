@@ -63,3 +63,15 @@ html, body {
 .toolbar-btn-group .btn:last-child {
   border-radius: 0 var(--bs-border-radius) var(--bs-border-radius) 0;
 }
+
+.outliner-item {
+  cursor: pointer;
+  border-radius: var(--bs-border-radius);
+}
+.outliner-item:hover {
+  background: var(--bs-tertiary-bg);
+}
+.outliner-item.selected {
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary);
+}

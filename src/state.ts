@@ -147,6 +147,16 @@ export class Store {
   setTool(tool: ToolType): void {
     this.selectedTool = tool;
     this.selectedItemId = null;
+    if (tool !== 'path') {
+      this.pendingPathWaypoints = [];
+      this.isDrawingPath = false;
+      this.pathPreview = null;
+    }
+    if (tool !== 'exclusionPolygon') {
+      this.pendingPolygonVertices = [];
+      this.isDrawingPolygon = false;
+      this.polygonPreview = null;
+    }
     this.notify();
   }
 

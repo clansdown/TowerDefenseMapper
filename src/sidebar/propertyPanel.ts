@@ -142,8 +142,11 @@ function renderPathForm(container: HTMLElement, path: Path): void {
 }
 
 function renderIntersectionForm(container: HTMLElement, intersection: Intersection): void {
+  const incomingPaths = (store.mapData?.paths ?? []).filter(
+    p => p.endAtIntersectionId === intersection.id
+  );
   const availablePaths = (store.mapData?.paths ?? []).filter(
-    p => !intersection.branches.some(b => b.pathId === p.id)
+    p => !intersection.branches.some(b => b.pathId === p.id) && p.endAtIntersectionId !== intersection.id
   );
 
   container.innerHTML = `
@@ -155,8 +158,17 @@ function renderIntersectionForm(container: HTMLElement, intersection: Intersecti
       <label class="form-label small">Position</label>
       <div class="text-muted small">(${intersection.x.toFixed(4)}, ${intersection.y.toFixed(4)})</div>
     </div>
+    <div class="mb-2">
+      <label class="form-label small">Paths Incoming</label>
+      ${incomingPaths.length === 0
+        ? '<div class="text-muted small">No incoming paths.</div>'
+        : incomingPaths.map(p =>
+            `<div class="text-muted small">╱ ${escapeHtml(p.label)}</div>`
+          ).join('')
+      }
+    </div>
     <div class="mb-2" id="branches-section">
-      <label class="form-label small">Branches</label>
+      <label class="form-label small">Outgoing Branches</label>
       <div id="branches-list">
         ${intersection.branches.length === 0
           ? '<div class="text-muted small">No branches configured.</div>'

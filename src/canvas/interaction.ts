@@ -2,7 +2,7 @@ import { store } from '../state';
 import { distance, distanceToSegment } from '../geometry';
 import { normalizedToScreen, screenToNormalized } from './coords';
 import { handleWheel, zoomToFit } from './zoomPan';
-import type { Point } from '../types';
+import type { Point, Intersection } from '../types';
 
 /* ---- Constants ---- */
 
@@ -181,6 +181,10 @@ function onMouseDown(event: MouseEvent, _canvas: HTMLCanvasElement): void {
   if (hit) {
     // Path tool special behaviors
     if (store.selectedTool === 'path') {
+      if (hit.type === 'intersection' && store.isDrawingPath) {
+        finishPathAtIntersection(hit.id);
+        return;
+      }
       if (hit.type === 'spawnPoint' && !store.isDrawingPath) {
         startPathFromSpawn(hit.id);
         return;
@@ -207,7 +211,9 @@ function onMouseDown(event: MouseEvent, _canvas: HTMLCanvasElement): void {
         drag = { kind: 'moveEndPoint', id: hit.id };
         break;
       case 'pathWaypoint':
-        if (store.selectedTool === 'path') {
+        if (store.isDrawingPath && store.selectedTool === 'path') {
+          finishPathAtPathIntersection(hit.id, mx, my, hit.index);
+        } else if (store.selectedTool === 'path') {
           insertWaypointAfter(hit.id, hit.index, mx, my);
         } else {
           drag = { kind: 'moveWaypoint', id: hit.id, index: hit.index };
@@ -226,7 +232,11 @@ function onMouseDown(event: MouseEvent, _canvas: HTMLCanvasElement): void {
         drag = { kind: 'resizeCircle', id: hit.id };
         break;
       case 'pathSegment':
-        insertWaypointOnSegment(hit.pathId, mx, my);
+        if (store.isDrawingPath && store.selectedTool === 'path') {
+          finishPathAtPathIntersection(hit.pathId, mx, my);
+        } else {
+          insertWaypointOnSegment(hit.pathId, mx, my);
+        }
         break;
     }
     return;
@@ -568,6 +578,135 @@ function finishPathAtEndPoint(endPointId: string): void {
   });
   store.pendingPathWaypoints = [];
   store.isDrawingPath = false;
+  store.pathPreview = null;
+}
+
+function finishPathAtIntersection(intersectionId: string): void {
+  if (!store.mapData || store.pendingPathWaypoints.length < MIN_WAYPOINTS_FOR_PATH) return;
+  const intersection = store.mapData.intersections.find(i => i.id === intersectionId);
+  if (!intersection) return;
+  store.pendingPathWaypoints.push({ x: intersection.x, y: intersection.y });
+  store.addPath({
+    id: store.generateId(),
+    label: `Path ${store.mapData.paths.length + 1}`,
+    waypoints: [...store.pendingPathWaypoints],
+    endAtIntersectionId: intersectionId,
+  });
+  store.pendingPathWaypoints = [];
+  store.isDrawingPath = false;
+  store.pathPreview = null;
+}
+
+function finishPathAtPathIntersection(
+  targetPathId: string,
+  mx: number,
+  my: number,
+  waypointIndex?: number,
+): void {
+  if (!store.mapData || !store.imageElement) return;
+  const targetPath = store.mapData.paths.find(p => p.id === targetPathId);
+  if (!targetPath || targetPath.waypoints.length < 2) return;
+
+  let insertIndex: number;
+  let intersectionPos: Point;
+
+  if (waypointIndex !== undefined) {
+    if (waypointIndex === 0 || waypointIndex === targetPath.waypoints.length - 1) return;
+    const wp = targetPath.waypoints[waypointIndex];
+    intersectionPos = { x: wp.x, y: wp.y };
+    insertIndex = waypointIndex;
+  } else {
+    let minDist = Infinity;
+    insertIndex = -1;
+    for (let i = 0; i < targetPath.waypoints.length - 1; i++) {
+      const a = normalizedToScreen(targetPath.waypoints[i].x, targetPath.waypoints[i].y);
+      const b = normalizedToScreen(targetPath.waypoints[i + 1].x, targetPath.waypoints[i + 1].y);
+      const d = distanceToSegment({ x: mx, y: my }, a, b);
+      if (d < minDist) {
+        minDist = d;
+        insertIndex = i + 1;
+      }
+    }
+    if (insertIndex === -1) return;
+    const pa = targetPath.waypoints[insertIndex - 1];
+    const pb = targetPath.waypoints[insertIndex];
+    const paScr = normalizedToScreen(pa.x, pa.y);
+    const pbScr = normalizedToScreen(pb.x, pb.y);
+    const abx = pbScr.x - paScr.x;
+    const aby = pbScr.y - paScr.y;
+    const len2 = abx * abx + aby * aby;
+    if (len2 <= 0) return;
+    let t = ((mx - paScr.x) * abx + (my - paScr.y) * aby) / len2;
+    t = Math.max(0, Math.min(1, t));
+    intersectionPos = {
+      x: pa.x + (pb.x - pa.x) * t,
+      y: pa.y + (pb.y - pa.y) * t,
+    };
+  }
+
+  const intersectionId = store.generateId();
+  const suffixPathId = store.generateId();
+  const drawnPathId = store.generateId();
+
+  let prefixWaypoints: Point[];
+  let suffixWaypoints: Point[];
+
+  if (waypointIndex !== undefined) {
+    prefixWaypoints = targetPath.waypoints.slice(0, insertIndex + 1);
+    suffixWaypoints = targetPath.waypoints.slice(insertIndex);
+  } else {
+    prefixWaypoints = [...targetPath.waypoints.slice(0, insertIndex), intersectionPos];
+    suffixWaypoints = [intersectionPos, ...targetPath.waypoints.slice(insertIndex)];
+  }
+
+  const drawnWaypoints = [...store.pendingPathWaypoints, intersectionPos];
+  if (drawnWaypoints.length < MIN_WAYPOINTS_FOR_PATH) return;
+
+  const newIntersection: Intersection = {
+    id: intersectionId,
+    label: `Intersection ${store.mapData.intersections.length + 1}`,
+    x: intersectionPos.x,
+    y: intersectionPos.y,
+    branches: [{ pathId: suffixPathId, weight: 1 }],
+  };
+
+  const newPaths = store.mapData.paths.map(p => {
+    if (p.id === targetPathId) {
+      return {
+        ...p,
+        waypoints: prefixWaypoints,
+        endAtIntersectionId: intersectionId,
+        endAtEndPointId: undefined,
+      };
+    }
+    return p;
+  });
+
+  newPaths.push({
+    id: suffixPathId,
+    label: `Path ${store.mapData.paths.length + 1}`,
+    waypoints: suffixWaypoints,
+    endAtIntersectionId: targetPath.endAtIntersectionId,
+    endAtEndPointId: targetPath.endAtEndPointId,
+  });
+
+  newPaths.push({
+    id: drawnPathId,
+    label: `Path ${store.mapData.paths.length + 2}`,
+    waypoints: drawnWaypoints,
+    endAtIntersectionId: intersectionId,
+  });
+
+  store.saveUndoSnapshot();
+  store.mapData = {
+    ...store.mapData,
+    paths: newPaths,
+    intersections: [...store.mapData.intersections, newIntersection],
+  };
+  store.pendingPathWaypoints = [];
+  store.isDrawingPath = false;
+  store.pathPreview = null;
+  store.notify();
 }
 
 function placeEndPoint(mx: number, my: number): void {

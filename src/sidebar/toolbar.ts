@@ -1,5 +1,6 @@
 import { store } from '../state';
 import type { ToolType } from '../types';
+import { openOutliner } from './outliner';
 
 const TOOLS: { type: ToolType; label: string; icon: string }[] = [
   { type: 'select', label: 'Select', icon: '↖' },
@@ -20,6 +21,8 @@ export function createToolbar(container: HTMLElement): void {
     <div class="p-3 border-bottom">
       <h6 class="text-uppercase text-muted mb-2" style="font-size: 0.75rem;">Tools</h6>
       <div class="toolbar-btn-group d-flex flex-wrap gap-1" id="tool-buttons"></div>
+      <hr class="my-2">
+      <button class="btn btn-outline-light btn-sm w-100" id="btn-outliner">🔍 Outliner</button>
       <hr class="my-2">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <span class="small">Snap to Intersections</span>
@@ -57,6 +60,8 @@ export function createToolbar(container: HTMLElement): void {
 
   const snapToggle = container.querySelector('#snap-toggle') as HTMLInputElement;
   snapToggle.addEventListener('change', () => store.setSnap(snapToggle.checked));
+
+  container.querySelector('#btn-outliner')!.addEventListener('click', openOutliner);
 
   container.querySelector('#btn-zoom-fit')!.addEventListener('click', () => {
     store.notify();
