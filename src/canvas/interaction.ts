@@ -215,6 +215,8 @@ function onMouseDown(event: MouseEvent, _canvas: HTMLCanvasElement): void {
           finishPathAtPathIntersection(hit.id, mx, my, hit.index);
         } else if (store.selectedTool === 'path') {
           insertWaypointAfter(hit.id, hit.index, mx, my);
+        } else if (store.selectedTool === 'intersection') {
+          splitPathAtIntersection(hit.id, hit.index);
         } else {
           drag = { kind: 'moveWaypoint', id: hit.id, index: hit.index };
         }
@@ -234,6 +236,8 @@ function onMouseDown(event: MouseEvent, _canvas: HTMLCanvasElement): void {
       case 'pathSegment':
         if (store.isDrawingPath && store.selectedTool === 'path') {
           finishPathAtPathIntersection(hit.pathId, mx, my);
+        } else if (store.selectedTool === 'intersection') {
+          splitPathAtIntersection(hit.pathId, mx, my);
         } else {
           insertWaypointOnSegment(hit.pathId, mx, my);
         }
@@ -425,6 +429,7 @@ function placeSpawnPoint(mx: number, my: number): void {
     y: n.y,
     intervalMs: 1000,
     initialDelayMs: 0,
+    priority: 1,
     targetPathId: '',
   });
 }
@@ -439,11 +444,13 @@ function addWaypoint(mx: number, my: number): void {
 
 function finishPath(): void {
   if (!store.mapData || store.pendingPathWaypoints.length < MIN_WAYPOINTS_FOR_PATH) return;
+  const pathId = store.generateId();
   store.addPath({
-    id: store.generateId(),
+    id: pathId,
     label: `Path ${store.mapData.paths.length + 1}`,
     waypoints: [...store.pendingPathWaypoints],
   });
+  linkPendingSource(pathId);
   store.pendingPathWaypoints = [];
   store.isDrawingPath = false;
   store.pathPreview = null;
@@ -534,34 +541,36 @@ function startPathFromSpawn(spawnId: string): void {
   if (!store.mapData) return;
   const spawn = store.mapData.spawnPoints.find(s => s.id === spawnId);
   if (!spawn) return;
-  const pathId = store.generateId();
-  store.saveUndoSnapshot();
-  store.addPath({
-    id: pathId,
-    label: `Path ${store.mapData.paths.length + 1}`,
-    waypoints: [{ x: spawn.x, y: spawn.y }],
-  });
-  store.updateSpawnPoint(spawnId, { targetPathId: pathId });
   store.pendingPathWaypoints = [{ x: spawn.x, y: spawn.y }];
   store.isDrawingPath = true;
+  store.pendingPathSource = { type: 'spawn', id: spawnId };
+  store.notify();
 }
 
 function startPathFromIntersection(intersectionId: string): void {
   if (!store.mapData) return;
   const intersection = store.mapData.intersections.find(i => i.id === intersectionId);
   if (!intersection) return;
-  const pathId = store.generateId();
-  store.saveUndoSnapshot();
-  store.addPath({
-    id: pathId,
-    label: `Path ${store.mapData.paths.length + 1}`,
-    waypoints: [{ x: intersection.x, y: intersection.y }],
-  });
-  store.updateIntersection(intersectionId, {
-    branches: [...intersection.branches, { pathId, weight: 1 }],
-  });
   store.pendingPathWaypoints = [{ x: intersection.x, y: intersection.y }];
   store.isDrawingPath = true;
+  store.pendingPathSource = { type: 'intersection', id: intersectionId };
+  store.notify();
+}
+
+function linkPendingSource(pathId: string): void {
+  const source = store.pendingPathSource;
+  if (!source) return;
+  if (source.type === 'spawn') {
+    store.updateSpawnPoint(source.id, { targetPathId: pathId });
+  } else {
+    const intersection = store.mapData?.intersections.find(i => i.id === source.id);
+    if (intersection) {
+      store.updateIntersection(source.id, {
+        branches: [...intersection.branches, { pathId, weight: 1 }],
+      });
+    }
+  }
+  store.pendingPathSource = null;
 }
 
 function finishPathAtEndPoint(endPointId: string): void {
@@ -576,9 +585,11 @@ function finishPathAtEndPoint(endPointId: string): void {
     waypoints: [...store.pendingPathWaypoints],
     endAtEndPointId: endPointId,
   });
+  linkPendingSource(pathId);
   store.pendingPathWaypoints = [];
   store.isDrawingPath = false;
   store.pathPreview = null;
+  store.notify();
 }
 
 function finishPathAtIntersection(intersectionId: string): void {
@@ -586,15 +597,18 @@ function finishPathAtIntersection(intersectionId: string): void {
   const intersection = store.mapData.intersections.find(i => i.id === intersectionId);
   if (!intersection) return;
   store.pendingPathWaypoints.push({ x: intersection.x, y: intersection.y });
+  const pathId = store.generateId();
   store.addPath({
-    id: store.generateId(),
+    id: pathId,
     label: `Path ${store.mapData.paths.length + 1}`,
     waypoints: [...store.pendingPathWaypoints],
     endAtIntersectionId: intersectionId,
   });
+  linkPendingSource(pathId);
   store.pendingPathWaypoints = [];
   store.isDrawingPath = false;
   store.pathPreview = null;
+  store.notify();
 }
 
 function finishPathAtPathIntersection(
@@ -703,9 +717,111 @@ function finishPathAtPathIntersection(
     paths: newPaths,
     intersections: [...store.mapData.intersections, newIntersection],
   };
+  linkPendingSource(drawnPathId);
   store.pendingPathWaypoints = [];
   store.isDrawingPath = false;
   store.pathPreview = null;
+  store.notify();
+}
+
+function splitPathAtIntersection(
+  targetPathId: string,
+  mxOrIndex: number,
+  my?: number,
+): void {
+  if (!store.mapData || !store.imageElement) return;
+  const targetPath = store.mapData.paths.find(p => p.id === targetPathId);
+  if (!targetPath || targetPath.waypoints.length < 2) return;
+
+  let insertIndex: number;
+  let intersectionPos: Point;
+
+  if (my === undefined) {
+    // Waypoint hit
+    const waypointIndex = mxOrIndex;
+    if (waypointIndex === 0 || waypointIndex === targetPath.waypoints.length - 1) return;
+    const wp = targetPath.waypoints[waypointIndex];
+    intersectionPos = { x: wp.x, y: wp.y };
+    insertIndex = waypointIndex;
+  } else {
+    // Segment hit — project mouse onto closest segment
+    const mx = mxOrIndex;
+    let minDist = Infinity;
+    insertIndex = -1;
+    for (let i = 0; i < targetPath.waypoints.length - 1; i++) {
+      const a = normalizedToScreen(targetPath.waypoints[i].x, targetPath.waypoints[i].y);
+      const b = normalizedToScreen(targetPath.waypoints[i + 1].x, targetPath.waypoints[i + 1].y);
+      const d = distanceToSegment({ x: mx, y: my }, a, b);
+      if (d < minDist) {
+        minDist = d;
+        insertIndex = i + 1;
+      }
+    }
+    if (insertIndex === -1) return;
+    const pa = targetPath.waypoints[insertIndex - 1];
+    const pb = targetPath.waypoints[insertIndex];
+    const paScr = normalizedToScreen(pa.x, pa.y);
+    const pbScr = normalizedToScreen(pb.x, pb.y);
+    const abx = pbScr.x - paScr.x;
+    const aby = pbScr.y - paScr.y;
+    const len2 = abx * abx + aby * aby;
+    if (len2 <= 0) return;
+    let t = ((mx - paScr.x) * abx + (my - paScr.y) * aby) / len2;
+    t = Math.max(0, Math.min(1, t));
+    intersectionPos = {
+      x: pa.x + (pb.x - pa.x) * t,
+      y: pa.y + (pb.y - pa.y) * t,
+    };
+  }
+
+  const intersectionId = store.generateId();
+  const suffixPathId = store.generateId();
+
+  let prefixWaypoints: Point[];
+  let suffixWaypoints: Point[];
+
+  if (my === undefined) {
+    prefixWaypoints = targetPath.waypoints.slice(0, insertIndex + 1);
+    suffixWaypoints = targetPath.waypoints.slice(insertIndex);
+  } else {
+    prefixWaypoints = [...targetPath.waypoints.slice(0, insertIndex), intersectionPos];
+    suffixWaypoints = [intersectionPos, ...targetPath.waypoints.slice(insertIndex)];
+  }
+
+  const newIntersection: Intersection = {
+    id: intersectionId,
+    label: `Intersection ${store.mapData.intersections.length + 1}`,
+    x: intersectionPos.x,
+    y: intersectionPos.y,
+    branches: [{ pathId: suffixPathId, weight: 1 }],
+  };
+
+  const newPaths = store.mapData.paths.map(p => {
+    if (p.id === targetPathId) {
+      return {
+        ...p,
+        waypoints: prefixWaypoints,
+        endAtIntersectionId: intersectionId,
+        endAtEndPointId: undefined,
+      };
+    }
+    return p;
+  });
+
+  newPaths.push({
+    id: suffixPathId,
+    label: `Path ${store.mapData.paths.length + 1}`,
+    waypoints: suffixWaypoints,
+    endAtIntersectionId: targetPath.endAtIntersectionId,
+    endAtEndPointId: targetPath.endAtEndPointId,
+  });
+
+  store.saveUndoSnapshot();
+  store.mapData = {
+    ...store.mapData,
+    paths: newPaths,
+    intersections: [...store.mapData.intersections, newIntersection],
+  };
   store.notify();
 }
 
@@ -767,5 +883,6 @@ function cancelDrawing(): void {
   }
   store.pathPreview = null;
   store.polygonPreview = null;
+  store.pendingPathSource = null;
   if (hadDrawing) store.notify();
 }

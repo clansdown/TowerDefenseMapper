@@ -22,9 +22,10 @@ function updatePanel(container: HTMLElement): void {
   const content = container.querySelector<HTMLElement>('#property-content')!;
   const item = store.getSelectedItem();
   if (!item) {
-    content.innerHTML = '<p class="text-muted small mb-0">Select an item on the map to edit its properties.</p>';
+    renderMapProperties(content);
     return;
   }
+
   if ('intervalMs' in item && 'targetPathId' in item) {
     renderSpawnPointForm(content, item as SpawnPoint);
   } else if ('waypoints' in item) {
@@ -36,6 +37,42 @@ function updatePanel(container: HTMLElement): void {
   } else {
     renderEndPointForm(content, item as EndPoint);
   }
+}
+
+function renderMapProperties(container: HTMLElement): void {
+  const md = store.mapData;
+  if (!md) {
+    container.innerHTML = '<p class="text-muted small mb-0">No map data loaded.</p>';
+    return;
+  }
+  container.innerHTML = `
+    <div class="mb-2">
+      <label class="form-label small">Map</label>
+      <div class="text-muted small">${escapeHtml(md.name)}</div>
+    </div>
+    <div class="mb-2">
+      <label class="form-label small">Difficulty (1.0 = easy)</label>
+      <input class="form-control form-control-sm" id="prop-difficulty" type="number" value="${md.difficulty}" min="0" step="0.1">
+    </div>
+    <div class="mb-2">
+      <label class="form-label small">Starting Coins</label>
+      <input class="form-control form-control-sm" id="prop-starting-coins" type="number" value="${md.startingCoins}" min="0" step="1">
+    </div>
+  `;
+
+  const diffInput = container.querySelector<HTMLInputElement>('#prop-difficulty')!;
+  diffInput.addEventListener('change', () => {
+    store.saveUndoSnapshot();
+    store.mapData = { ...store.mapData!, difficulty: parseFloat(diffInput.value) || 1.0 };
+    store.notify();
+  });
+
+  const coinsInput = container.querySelector<HTMLInputElement>('#prop-starting-coins')!;
+  coinsInput.addEventListener('change', () => {
+    store.saveUndoSnapshot();
+    store.mapData = { ...store.mapData!, startingCoins: parseInt(coinsInput.value, 10) || 100 };
+    store.notify();
+  });
 }
 
 function renderSpawnPointForm(container: HTMLElement, spawn: SpawnPoint): void {
@@ -57,6 +94,10 @@ function renderSpawnPointForm(container: HTMLElement, spawn: SpawnPoint): void {
         <label class="form-label small">Initial Delay (ms)</label>
         <input class="form-control form-control-sm" id="prop-delay" type="number" value="${spawn.initialDelayMs}" min="0">
       </div>
+    </div>
+    <div class="mb-2">
+      <label class="form-label small">Priority (weight)</label>
+      <input class="form-control form-control-sm" id="prop-priority" type="number" value="${spawn.priority}" min="1" step="1">
     </div>
     <div class="mb-2">
       <label class="form-label small">Target Path</label>
@@ -81,6 +122,10 @@ function renderSpawnPointForm(container: HTMLElement, spawn: SpawnPoint): void {
   container.querySelector('#prop-delay')!.addEventListener('change', (e) => {
     store.saveUndoSnapshot();
     store.updateSpawnPoint(spawn.id, { initialDelayMs: Number((e.target as HTMLInputElement).value) });
+  });
+  container.querySelector('#prop-priority')!.addEventListener('change', (e) => {
+    store.saveUndoSnapshot();
+    store.updateSpawnPoint(spawn.id, { priority: parseInt((e.target as HTMLInputElement).value, 10) || 1 });
   });
   container.querySelector('#prop-target-path')!.addEventListener('change', (e) => {
     store.saveUndoSnapshot();

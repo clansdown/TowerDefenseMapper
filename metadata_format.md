@@ -11,6 +11,8 @@ This document specifies the JSON metadata format produced by TowerDefenseMapper 
   "formatVersion": "1.0",
   "name": "MyMap",
   "imageFilename": "my_map.png",
+  "difficulty": 1.0,
+  "startingCoins": 100,
   "spawnPoints": [ ... ],
   "paths": [ ... ],
   "intersections": [ ... ],
@@ -24,6 +26,8 @@ This document specifies the JSON metadata format produced by TowerDefenseMapper 
 | `formatVersion` | string | yes | Format version string for compatibility checking |
 | `name` | string | yes | Human-readable map name |
 | `imageFilename` | string | yes | Original map image filename (for reference only) |
+| `difficulty` | number | yes | Map difficulty rating (1.0 = easy, higher = harder) |
+| `startingCoins` | number | yes | Initial coin balance the player starts with |
 | `spawnPoints` | SpawnPoint[] | yes | Array of enemy spawn points |
 | `paths` | Path[] | yes | Array of path polylines |
 | `intersections` | Intersection[] | yes | Array of path intersection nodes |
@@ -42,6 +46,7 @@ A point where enemies enter the map.
   "y": 0.50,
   "intervalMs": 1000,
   "initialDelayMs": 0,
+  "priority": 1,
   "targetPathId": "path-1"
 }
 ```
@@ -54,6 +59,7 @@ A point where enemies enter the map.
 | `y` | number | yes | Normalized Y position (0–1) |
 | `intervalMs` | number | yes | Milliseconds between consecutive enemy spawns |
 | `initialDelayMs` | number | yes | Milliseconds before the first enemy spawns |
+| `priority` | number | yes | Relative spawn weight (higher = more likely to be selected by the game engine) |
 | `targetPathId` | string | yes | ID of the first path enemies follow |
 
 ## Path

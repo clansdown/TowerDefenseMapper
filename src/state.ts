@@ -33,6 +33,8 @@ export class Store {
   pathPreview: Point | null = null;
   /** Cursor position preview while drawing a polygon, in normalized coords */
   polygonPreview: Point | null = null;
+  /** The spawn or intersection that started the current path drawing */
+  pendingPathSource: { type: 'spawn'; id: string } | { type: 'intersection'; id: string } | null = null;
   /** Set to true by loadImage to signal the UI should call zoomToFit */
   shouldZoomToFit = false;
   zoomPan: ZoomPanState = { offsetX: 0, offsetY: 0, scale: 1 };
@@ -101,6 +103,7 @@ export class Store {
     this.isDrawingPolygon = false;
     this.pathPreview = null;
     this.polygonPreview = null;
+    this.pendingPathSource = null;
     this.notify();
   }
 
@@ -118,6 +121,7 @@ export class Store {
     this.isDrawingPolygon = false;
     this.pathPreview = null;
     this.polygonPreview = null;
+    this.pendingPathSource = null;
     this.notify();
   }
 
@@ -131,6 +135,8 @@ export class Store {
       formatVersion: '1.0',
       name: filename.replace(/\.[^.]+$/, ''),
       imageFilename: filename,
+      difficulty: 1.0,
+      startingCoins: 100,
       spawnPoints: [],
       paths: [],
       intersections: [],
@@ -151,6 +157,7 @@ export class Store {
       this.pendingPathWaypoints = [];
       this.isDrawingPath = false;
       this.pathPreview = null;
+      this.pendingPathSource = null;
     }
     if (tool !== 'exclusionPolygon') {
       this.pendingPolygonVertices = [];

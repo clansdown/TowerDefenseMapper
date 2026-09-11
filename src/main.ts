@@ -28,7 +28,7 @@ function main(): void {
   const canvasContainer = app.querySelector<HTMLElement>('#canvas-container')!;
   const canvas = app.querySelector<HTMLCanvasElement>('#map-canvas')!;
 
-  createToolbar(toolbarContainer);
+  createToolbar(toolbarContainer, canvas);
   createPropertyPanel(propertiesContainer);
   createExportImport(exportContainer, canvasContainer);
 

@@ -12,11 +12,11 @@ export function createExportImport(container: HTMLElement, canvasContainer: HTML
       <button class="btn btn-outline-light btn-sm w-100 mb-2" id="btn-open-image">
         📂 Open Image
       </button>
-      <button class="btn btn-outline-light btn-sm w-100 mb-2" id="btn-export-json">
-        💾 Export JSON
-      </button>
-      <button class="btn btn-outline-light btn-sm w-100" id="btn-import-json">
+      <button class="btn btn-outline-light btn-sm w-100 mb-2" id="btn-import-json">
         📄 Import JSON
+      </button>
+      <button class="btn btn-outline-light btn-sm w-100" id="btn-export-json">
+        💾 Export JSON
       </button>
       <div class="mt-2">
         <p class="text-muted small mb-0" id="image-info">No image loaded</p>

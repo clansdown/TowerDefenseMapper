@@ -13,6 +13,7 @@ export interface SpawnPoint {
   y: number;
   intervalMs: number;
   initialDelayMs: number;
+  priority: number;
   targetPathId: string;
 }
 
@@ -64,6 +65,8 @@ export interface MapMetadata {
   formatVersion: string;
   name: string;
   imageFilename: string;
+  difficulty: number;
+  startingCoins: number;
   spawnPoints: SpawnPoint[];
   paths: Path[];
   intersections: Intersection[];

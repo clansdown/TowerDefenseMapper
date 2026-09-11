@@ -1,6 +1,7 @@
 import { store } from '../state';
 import type { ToolType } from '../types';
 import { openOutliner } from './outliner';
+import { zoomToFit } from '../canvas/zoomPan';
 
 const TOOLS: { type: ToolType; label: string; icon: string }[] = [
   { type: 'select', label: 'Select', icon: '↖' },
@@ -16,7 +17,7 @@ const TOOLS: { type: ToolType; label: string; icon: string }[] = [
  * Create and mount the toolbar into the sidebar.
  * Contains tool selection buttons, snap toggle, and zoom controls.
  */
-export function createToolbar(container: HTMLElement): void {
+export function createToolbar(container: HTMLElement, canvas: HTMLCanvasElement): void {
   container.innerHTML = `
     <div class="p-3 border-bottom">
       <h6 class="text-uppercase text-muted mb-2" style="font-size: 0.75rem;">Tools</h6>
@@ -64,7 +65,7 @@ export function createToolbar(container: HTMLElement): void {
   container.querySelector('#btn-outliner')!.addEventListener('click', openOutliner);
 
   container.querySelector('#btn-zoom-fit')!.addEventListener('click', () => {
-    store.notify();
+    zoomToFit(canvas);
   });
 
   // Re-apply active state when tool changes
